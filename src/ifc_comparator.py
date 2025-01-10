@@ -3,6 +3,7 @@ import logging
 import sys
 
 import ifcopenshell
+import ifcopenshell.util.element
 
 from src.differences_collector import DifferencesCollector
 from src.fuzzy_hashmap import FuzzyHashmap
@@ -28,9 +29,14 @@ def find_different_keys(dict1, dict2):
 
 
 def get_attributes(element):
-    return {attribute_name: element.get_info()[attribute_name]
-            for attribute_name in
-            element.get_info(recursive=True, include_identifier=False, ignore={"GlobalId", "OwnerHistory"}).keys()}
+    attributes = element.get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"})  # "GlobalId",
+
+    attributes["Properties"] = ifcopenshell.util.element.get_psets(element)
+    attributes["Materials"] = ifcopenshell.util.element.get_material(element).get_info(recursive=True,
+                                                                                       ignore={
+                                                                                           "OwnerHistory"})  # get_materials(element)
+
+    return attributes
 
 
 class IFCComparator(FileComparator):
@@ -88,6 +94,3 @@ class IFCComparator(FileComparator):
 
         return True if len(differences) == 0 else False
 
-# if __name__ == "__main__":
-#     comparator = IFCComparator('file1.ifc', 'file2.ifc')
-#     comparator.compare_files()
