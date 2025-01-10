@@ -1,5 +1,6 @@
 import argparse
 import json
+import pprint
 from typing import TextIO
 
 from src.differences_collector import DifferencesCollector
@@ -30,6 +31,7 @@ def main():
     else:
         print("No differences found.")
 
+    print("Done.")
 
 if __name__ == "__main__":
     # python .\main.py -f1 .\tests\materialLayer1.ifc -f2 .\tests\materialLayer2.ifc -dir .
