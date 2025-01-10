@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from src.differences_collector import DifferencesCollector
-from src.ifc_comparator import IFCComparator
-
 
 class FileType(Enum):
     IFC = 1
@@ -27,5 +25,5 @@ class FileComparatorFactory(ABC):
 
     @abstractmethod
     def create(self, file_type: FileType,
-               collector: DifferencesCollector = None):  # differences collector could also be some interface
+               collector: DifferencesCollector = None):  #TODO reafctor differences collector to interface
         pass

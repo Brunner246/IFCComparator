@@ -18,27 +18,6 @@ class FuzzyHashmap:
         self._hash = self._calculate_hash()
         self.collector = collector  # or DifferencesCollector()
 
-    # def _round_value(self, value):
-    #     """
-    #     Rounds a float or recursively processes nested data structures.
-    #     """
-    #     mod = - int(round(math.log10(self.tolerance * 100)))  # log10(1e-5) = -5
-    #     if isinstance(value, float):
-    #         # print "round(%r, %r) = %r" % (v, mod, round(v, mod))
-    #         return round(value, mod)
-    #     elif isinstance(value, Mapping):
-    #         return tuple(sorted((key, self._round_value(val)) for key, val in value.items()))
-    #     elif isinstance(value, Sequence) and not isinstance(value, str):
-    #         return tuple(self._round_value(v) for v in value)
-    #     else:
-    #         return value
-    #
-    # def _calculate_hash(self):
-    #     """
-    #     Computes a hash for the dictionary based on rounded values.
-    #     """
-    #     return hash(self._round_value(self.data))
-
     def __hash__(self):
         return self._hash
 
@@ -88,8 +67,8 @@ class FuzzyHashmap:
                 return round(value, self.mod)
             elif isinstance(value, dict):
                 return tuple(sorted((k, _round_value(v)) for k, v in value.items()))
-            elif isinstance(value, (tuple, list)):
-                return type(value)(map(_round_value, value))
+            elif isinstance(value, (tuple, list, set)):
+                return tuple(map(_round_value, value))
             else:
                 return value
 

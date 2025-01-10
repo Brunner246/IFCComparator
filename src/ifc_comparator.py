@@ -52,25 +52,25 @@ class IFCComparator(FileComparator):
         self.deleted_from_old = set()
         self.unchanged_in_new = set()
 
-    def compare_elements(self, element1, element2):
-        attrs1 = FuzzyHashmap(get_attributes(element1), collector=self.collector)
-        attrs2 = FuzzyHashmap(get_attributes(element2), collector=self.collector)
+    def compare_elements(self, entity_lhs, entity_rhs):
+        attrs1 = FuzzyHashmap(get_attributes(entity_lhs), collector=self.collector)
+        attrs2 = FuzzyHashmap(get_attributes(entity_rhs), collector=self.collector)
 
         keys_only_in_dict1, keys_only_in_dict2 = find_different_keys(self.old_file_entities, self.new_file_entities)
 
         if attrs1 != attrs2:
-            logger.warning(f"Attributes differ between GUID {element1.GlobalId} and GUID {element2.GlobalId}")
+            logger.warning(f"Attributes differ between GUID {entity_lhs.GlobalId} and GUID {entity_rhs.GlobalId}")
             pprint.pprint(attrs1.get_differences())
-            self.added_in_new.add(element2.GlobalId)
+            self.added_in_new.add(entity_rhs.GlobalId)
             return False
 
         if keys_only_in_dict1 - keys_only_in_dict2:
-            logger.warning(f"Attributes missing in {element2.GlobalId}")
-            self.added_in_new.add(element2.GlobalId)
+            logger.warning(f"Attributes missing in {entity_rhs.GlobalId}")
+            self.added_in_new.add(entity_rhs.GlobalId)
             return False
         if keys_only_in_dict2 - keys_only_in_dict1:
-            logger.warning(f"Attributes missing in {element1.GlobalId}")
-            self.deleted_from_old.add(element1.GlobalId)
+            logger.warning(f"Attributes missing in {entity_lhs.GlobalId}")
+            self.deleted_from_old.add(entity_lhs.GlobalId)
 
             return False
         return True
