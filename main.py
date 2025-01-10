@@ -1,6 +1,5 @@
 import argparse
 import json
-import pprint
 from typing import TextIO
 
 from src.differences_collector import DifferencesCollector

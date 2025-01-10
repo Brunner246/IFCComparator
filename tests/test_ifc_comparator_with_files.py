@@ -1,7 +1,6 @@
 import unittest
 
 from src.file_comparator_factory_impl import IfcFileComparatorFactoryImpl
-from src.ifc_comparator import IFCComparator  # assuming the class is defined in a file named ifc_comparator.py
 from src.differences_collector import DifferencesCollector
 from src.interfaces.file_comparator_factory import FileType
 
