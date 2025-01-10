@@ -1,5 +1,8 @@
 import ifcopenshell
 
+from src.fuzzy_hashmap import FuzzyHashmap
+
+
 class IFCComparator:
     def __init__(self, file1_path, file2_path):
         self.file1 = ifcopenshell.open(file1_path)
@@ -12,13 +15,11 @@ class IFCComparator:
         return attributes
 
     def get_geometry_hash(self, element):
-        # Placeholder for geometry processing logic
-        # This function should return a hash value based on the geometry of the element
         return hash(str(element.Representation))
 
     def compare_elements(self, element1, element2):
-        attrs1 = self.get_attributes(element1)
-        attrs2 = self.get_attributes(element2)
+        attrs1 = FuzzyHashmap(self.get_attributes(element1))
+        attrs2 = FuzzyHashmap(self.get_attributes(element2))
 
         if attrs1 != attrs2:
             print(f"Attributes differ between {element1.GlobalId} and {element2.GlobalId}")
