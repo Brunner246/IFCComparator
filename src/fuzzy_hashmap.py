@@ -8,18 +8,13 @@ class FuzzyHashmap:
     Supports nested structures with floats, lists, and dictionaries.
     """
 
-    def __init__(self, data, tolerance: float = 1e-5):
-        """
-        Initializes the FuzzyHashmap.
-
-        :param data: The dictionary to wrap and compare.
-        :param tolerance: The allowable numerical difference for floating-point comparisons.
-        """
+    def __init__(self, data, tolerance: float = 1e-5, collector=None):
         if not isinstance(data, Mapping):
             raise TypeError("Input data must be a dictionary or a mapping-like object.")
         self.data = data
         self.tolerance = tolerance
         self._hash = self._calculate_hash()
+        self.collector = collector  # or DifferencesCollector()
 
     def _round_value(self, value):
         """
@@ -45,31 +40,75 @@ class FuzzyHashmap:
     def __hash__(self):
         return self._hash
 
+    def compare_values(self, val1, val2, entity_name):
+        if type(val1) != type(val2):
+            self.collector.add_difference(entity_name, val1, val2)
+            return False
+        if isinstance(val1, float):
+            print(val1, val2)
+            if abs(val1 - val2) > self.tolerance:
+                self.collector.add_difference(entity_name, val1, val2)
+                return False
+            return True
+        elif isinstance(val1, Mapping):
+            return FuzzyHashmap(val1, self.tolerance, self.collector)._compare(val2, entity_name)
+        elif isinstance(val1, Sequence) and not isinstance(val1, str):
+            if len(val1) != len(val2):
+                self.collector.add_difference(entity_name, val1, val2)
+                return False
+            return all(self.compare_values(v1, v2, entity_name + [i]) for i, (v1, v2) in enumerate(zip(val1, val2)))
+        else:
+            if val1 != val2:
+                self.collector.add_difference(entity_name, val1, val2)
+                return False
+            return True
+
     def __eq__(self, other):
         if not isinstance(other, FuzzyHashmap):
             return False
 
-        def compare_values(val1, val2):
-            if type(val1) != type(val2):
-                return False
-            if isinstance(val1, float):
-                return abs(val1 - val2) <= self.tolerance
-            elif isinstance(val1, Mapping):
-                return FuzzyHashmap(val1, self.tolerance) == FuzzyHashmap(val2,
-                                                                          self.tolerance)  # compare newly created FuzzyHashmaps for nested dictionaries
-            elif isinstance(val1, Sequence) and not isinstance(val1, str):
-                return len(val1) == len(val2) and all(
-                    compare_values(v1, v2) for v1, v2 in zip(val1, val2)
-                )
-            else:
-                return val1 == val2
-
         if set(self.data.keys()) != set(other.data.keys()):
+            self.collector.add_difference("keys", set(self.data.keys()), set(other.data.keys()))
             return False
 
-        return all(
-            compare_values(self.data[key], other.data[key]) for key in self.data
-        )
+        # all aborts on first False
+        # return all(
+        #     self.compare_values(self.data[pair], other.data[pair], pair)
+        #     for pair in self.data
+        # )
+        marker = list()
+        for pair in self.data:
+            equals = self.compare_values(self.data[pair], other.data[pair], pair)
+            marker.append(equals)
+        return all(marker)
+
+    def _compare(self, other, entity_name):
+        """
+        Compares dictionaries and tracks differences.
+        """
+        if not isinstance(other, Mapping):
+            self.collector.add_difference(entity_name, self.data, other)
+            return False
+        keys1 = set(self.data.keys())
+        keys2 = set(other.keys())
+
+        for key in keys1 - keys2:
+            self.collector.add_difference(entity_name + [key], self.data[key], None)
+
+        for key in keys2 - keys1:
+            self.collector.add_difference(entity_name + [key], None, other[key])
+
+        for key in keys1 & keys2:
+            val1 = self.data[key]
+            val2 = other[key]
+            new_path = entity_name + [key]
+            if not self.compare_values(val1, val2, new_path):
+                self.collector.add_difference(new_path, val1, val2)
+
+        return len(self.collector.get_differences()) == 0
+
+    def get_differences(self):
+        return self.collector.get_differences()
 
     def __repr__(self):
         return f"FuzzyHashmap(data={self.data}, tolerance={self.tolerance})"

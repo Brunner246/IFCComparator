@@ -1,0 +1,12 @@
+class DifferencesCollector:
+    def __init__(self):
+        self.differences = set()
+
+    def add_difference(self, key_path: str, val1, val2):
+        self.differences.add((key_path, val1, val2))
+
+    def get_differences(self):
+        return self.differences
+
+    def clear(self):
+        self.differences.clear()
