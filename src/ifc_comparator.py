@@ -88,9 +88,8 @@ class IFCComparator(FileComparator):
                 differences.append(
                     f"Element Name [{element1.Name}] with GUID [{global_id}] is missing in the second file")
 
-        for global_id in self.new_file_entities.keys():
-            if global_id not in self.old_file_entities:
-                differences.append(f"Element {global_id} is missing in the first file")
+        differences += [f"Element {global_id} is missing in the first file"
+                        for global_id in self.new_file_entities.keys()
+                        if global_id not in self.old_file_entities]
 
         return True if len(differences) == 0 else False
-

@@ -1,11 +1,10 @@
 import math
-import pprint
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 
 class FuzzyHashmap:
     """
-    A dictionary-like structure for approximate comparisons of numerical values.
+    A dictionary-like structure for approximate comparisons of numerical values and strings.
     Supports nested structures with floats, lists, and dictionaries.
     """
 

@@ -25,6 +25,8 @@ class TestFuzzyHashmap(unittest.TestCase):
     def test_fuzzy_hashmap_hash_consistency(self):
         fmap1 = FuzzyHashmap(self.data1, 1e-4, self.collector)
         fmap2 = FuzzyHashmap(self.data2, 1e-4, self.collector)
+        print(f"hash1: {hash(fmap1)}")
+        print(f"hash2: {hash(fmap2)}")
         self.assertEqual(hash(fmap1), hash(fmap2))
 
     def test_fuzzy_hashmap_type_error(self):
