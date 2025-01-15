@@ -5,8 +5,8 @@ import sys
 import ifcopenshell
 import ifcopenshell.util.element
 
-from src.differences_collector import DifferencesCollector
 from src.fuzzy_hashmap import FuzzyHashmap
+from src.interfaces.differences_collector import DifferencesCollector
 from src.interfaces.file_comparator import FileComparator
 
 handler = logging.StreamHandler(sys.stdout)

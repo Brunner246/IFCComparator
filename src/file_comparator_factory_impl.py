@@ -1,4 +1,4 @@
-from src.differences_collector import DifferencesCollector
+from src.interfaces.differences_collector import DifferencesCollector
 from src.ifc_comparator import IFCComparator
 from src.interfaces.file_comparator import FileComparator
 from src.interfaces.file_comparator_factory import FileComparatorFactory, FileType

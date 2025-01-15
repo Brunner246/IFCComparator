@@ -1,7 +1,7 @@
 import unittest
 
 from src.file_comparator_factory_impl import IfcFileComparatorFactoryImpl
-from src.differences_collector import DifferencesCollector
+from src.list_differences_collector import ListDifferencesCollector
 from src.interfaces.file_comparator_factory import FileType
 
 
@@ -13,7 +13,7 @@ class TestIFCComparator(unittest.TestCase):
         # self.file2_path = './materialLayer2.ifc'
 
         factory = IfcFileComparatorFactoryImpl(self.file1_path, self.file2_path)
-        self.comparator = factory.create(FileType.IFC, DifferencesCollector())
+        self.comparator = factory.create(FileType.IFC, ListDifferencesCollector())
 
     def test_compare_files(self):
         self.assertTrue(self.comparator.compare_files())

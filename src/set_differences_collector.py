@@ -1,4 +1,7 @@
-class DifferencesCollector:
+from src.interfaces.differences_collector import DifferencesCollector
+
+
+class SetDifferencesCollector(DifferencesCollector):
     def __init__(self):
         self.differences = set()
 

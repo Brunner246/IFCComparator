@@ -1,6 +1,6 @@
 import unittest
 
-from src.differences_collector import DifferencesCollector
+from src.differences_collector_factory import DifferencesCollectorFactory, CollectionType
 from src.fuzzy_hashmap import FuzzyHashmap
 
 
@@ -10,7 +10,7 @@ class TestFuzzyHashmap(unittest.TestCase):
         self.data2 = {'a': 1.00002, 'b': {1.00002, 2.00002}, 'c': {'d': 3.00002}}
         self.data3 = {'a': 1.1, 'b': {1.1, 2.1}, 'c': {'d': 3.1}}
         self.tolerance = 1e-5
-        self.collector = DifferencesCollector()
+        self.collector = DifferencesCollectorFactory.create(CollectionType.LIST)
 
     def test_fuzzy_hashmap_equality(self):
         fmap1 = FuzzyHashmap(self.data1, self.tolerance, self.collector)
