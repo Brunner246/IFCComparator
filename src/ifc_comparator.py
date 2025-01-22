@@ -1,13 +1,16 @@
-import pprint
 import logging
+import pprint
 import sys
+from typing import List
 
 import ifcopenshell
+import ifcopenshell.util
 import ifcopenshell.util.element
 
 from src.fuzzy_hashmap import FuzzyHashmap
 from src.interfaces.differences_collector import DifferencesCollector
 from src.interfaces.file_comparator import FileComparator
+from src.value_comparison_strategies import ComparisonStrategy
 
 handler = logging.StreamHandler(sys.stdout)
 frm = logging.Formatter("{asctime} {levelname}: {message}", "%d.%m.%Y %H:%M:%S", style="{")
@@ -29,17 +32,24 @@ def find_different_keys(dict1, dict2):
 
 
 def get_attributes(element):
-    attributes = element.get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"})  # "GlobalId",
-
+    attributes = element.get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"})
     attributes["Properties"] = ifcopenshell.util.element.get_psets(element)
     attributes["Materials"] = ifcopenshell.util.element.get_material(element).get_info(recursive=True,
                                                                                        ignore={
-                                                                                           "OwnerHistory"})  # get_materials(element)
+                                                                                           "OwnerHistory"})
+    if element.is_a("IfcWall"):
+        mat = (ifcopenshell.util.element.get_material(element).get_info(recursive=False, ignore={"OwnerHistory"}))
+    materials = ifcopenshell.util.element.get_materials(element)
+    dict().update()
+    for material in materials:
+        attributes[material.Name] = material.get_info(recursive=True, ignore={"OwnerHistory"})
+        if element.is_a("IfcWall"): print(material.get_info(recursive=True, ignore={"OwnerHistory"}))
 
     return attributes
 
 
 class IFCComparator(FileComparator):
+
     def __init__(self, file1_path, file2_path, collector: DifferencesCollector = None):
         self.file1 = ifcopenshell.open(file1_path)
         self.file2 = ifcopenshell.open(file2_path)
@@ -47,20 +57,26 @@ class IFCComparator(FileComparator):
         self.collector = collector
         self.old_file_entities = {e.GlobalId: e for e in self.file1.by_type('IfcBuildingElement')}
         self.new_file_entities = {e.GlobalId: e for e in self.file2.by_type('IfcBuildingElement')}
+        self.comparison_strategy: List[ComparisonStrategy] | None = None
+        self.keys_to_ignore: List[str] = []
 
         self.added_in_new = set()
         self.deleted_from_old = set()
         self.unchanged_in_new = set()
 
     def compare_elements(self, entity_lhs, entity_rhs):
-        attrs1 = FuzzyHashmap(get_attributes(entity_lhs), collector=self.collector)
-        attrs2 = FuzzyHashmap(get_attributes(entity_rhs), collector=self.collector)
+        fuzzy_attrs1 = FuzzyHashmap(get_attributes(entity_lhs), tolerance=1e-3, collector=self.collector,
+                                    comparison_strategies=self.comparison_strategy)  # numeric_comparison_strategy
+        fuzzy_attrs2 = FuzzyHashmap(get_attributes(entity_rhs), tolerance=1e-3, collector=self.collector,
+                                    comparison_strategies=self.comparison_strategy)
+        if self.keys_to_ignore:
+            [fuzzy.set_keys_to_ignore([key]) for fuzzy in [fuzzy_attrs1, fuzzy_attrs2] for key in self.keys_to_ignore]
 
         keys_only_in_dict1, keys_only_in_dict2 = find_different_keys(self.old_file_entities, self.new_file_entities)
 
-        if attrs1 != attrs2:
+        if fuzzy_attrs1 != fuzzy_attrs2:
             logger.warning(f"Attributes differ between GUID {entity_lhs.GlobalId} and GUID {entity_rhs.GlobalId}")
-            pprint.pprint(attrs1.get_differences())
+            # pprint.pprint(fuzzy_attrs1.get_differences())
             self.added_in_new.add(entity_rhs.GlobalId)
             return False
 
@@ -93,3 +109,10 @@ class IFCComparator(FileComparator):
                         if global_id not in self.old_file_entities]
 
         return True if len(differences) == 0 else False
+
+    def set_comparison_strategy(self,
+                                comparison_strategy: List[ComparisonStrategy]):
+        self.comparison_strategy = comparison_strategy
+
+    def set_keys_to_ignore(self, keys: List[str]):
+        self.keys_to_ignore = keys
