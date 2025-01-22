@@ -36,15 +36,19 @@ def main():
     factory = IfcFileComparatorFactoryImpl(args.file1_path, args.file2_path)
     differences_collector = DifferencesCollectorFactory.create(CollectionType.LIST)
     comparator: FileComparator = factory.create(FileType.IFC, differences_collector)
-    strategies = [StrategyFactory.create_strategy(ComparisonStrategyType(st)) for st in args.strategy]
-    if strategies:
+    if args.strategy:
+        strategies = [StrategyFactory.create_strategy(ComparisonStrategyType(st)) for st in args.strategy]
         comparator.set_comparison_strategy(strategies)
+
     if args.ignore:
         comparator.set_keys_to_ignore(args.ignore)
     result = comparator.compare_files()
 
     if not result:
         differences = list(differences_collector.get_differences())
+        if not differences:
+            print("No differences found.")
+            return sys.exit(0)
         output_data = {"errors": differences}
         with open(output_path, 'w') as json_file:  # type: TextIO
             json.dump(output_data, json_file, indent=4)

@@ -1,7 +1,6 @@
-import collections
 import math
 from collections.abc import Mapping, Sequence
-from typing import List, Tuple
+from typing import List
 
 from src.value_comparison_strategies import ComparisonStrategy
 
@@ -16,26 +15,6 @@ def equals_values(val1, val2):
 
 def is_float_type(obj):
     return isinstance(obj, float)
-
-
-def compare_numeric_elements(val1, val2, title, collector, equals):
-    """
-    Compare elements of two lists or tuples by collecting numeric items (int or float),
-    sorting them, and then comparing.
-    """
-    if isinstance(val1, (tuple, list)) and isinstance(val2, (tuple, list)):
-        numeric_list1 = [v for v in val1 if isinstance(v, (int, float))]
-        numeric_list2 = [v for v in val2 if isinstance(v, (int, float))]
-
-        sorted_list1 = sorted(numeric_list1)
-        sorted_list2 = sorted(numeric_list2)
-
-        if sorted_list1 != sorted_list2:
-            collector.add_difference(f"{title}: Numeric lists differ", sorted_list1, sorted_list2)
-
-        for i, (v1, v2) in enumerate(zip(val1, val2)):
-            if not equals(v1, v2):
-                collector.add_difference(f"{title}, index: {i}", v1, v2)
 
 
 class FuzzyHashmap:
@@ -54,7 +33,7 @@ class FuzzyHashmap:
         self._hash = self._calculate_hash()
         self.collector = collector
         self.compare_numeric_lists: List[ComparisonStrategy] | None = comparison_strategies
-        self.keys_to_ignore: List[str] = []
+        self.parent_entity_guid: str = ""
 
     def __hash__(self):
         return self._hash
@@ -66,16 +45,17 @@ class FuzzyHashmap:
                 if abs(lhs - rhs) > self.tolerance:
                     return False
             elif isinstance(lhs, dict):
-                fuzzy1 = FuzzyHashmap(lhs, self.tolerance, self.collector, self.compare_numeric_lists)
-                fuzzy1.set_keys_to_ignore(self.keys_to_ignore)
-                fuzzy2 = FuzzyHashmap(rhs, self.tolerance, self.collector, self.compare_numeric_lists)
-                fuzzy2.set_keys_to_ignore(self.keys_to_ignore)
+                fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(lhs, rhs)
                 if not (fuzzy1 == fuzzy2):
                     return False
             elif isinstance(lhs, (tuple, list)):
                 if len(lhs) != len(rhs):
                     return False
                 for a, b in zip(lhs, rhs):
+                    if isinstance(a, dict):
+                        fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(a, b)
+                        if not (fuzzy1 == fuzzy2):
+                            return False
                     if not equals(a, b):
                         return False
             else:
@@ -90,10 +70,6 @@ class FuzzyHashmap:
             val1 = self.data[k]
             val2 = other.data[k]
 
-            if k in self.keys_to_ignore:
-                print(f"Ignoring key: {k}")
-                continue
-
             processed: bool = False
 
             if self.compare_numeric_lists and is_sequence_but_not_str(val1) and is_sequence_but_not_str(val2):
@@ -102,7 +78,7 @@ class FuzzyHashmap:
                     if sorted_list1 == [] and sorted_list2 == []: continue
                     if sorted_list1 != sorted_list2:
                         differences.append(False)
-                        title = f"Key: {k}, GlobalId: {self.data.get('GlobalId', 'None')}"
+                        title = f"{k}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
                         self.compare(title, sorted_list1, sorted_list2)
                         processed = True
                         break
@@ -112,7 +88,7 @@ class FuzzyHashmap:
 
             if not processed and not equals(val1, val2):
                 differences.append(False)
-                title = f"Key: {k}, GlobalId: {self.data.get('GlobalId')}"
+                title = f"Key: {k}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
                 self.compare(title, val1, val2)
         return differences == []
 
@@ -136,9 +112,9 @@ class FuzzyHashmap:
         return hash(_round_value(self.data))
 
     def compare_sequences(self, key: str, val1: Sequence, val2: Sequence):
+        differences = []
+        # title = f"Key: {key}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
         if is_sequence_but_not_str(val1) and is_sequence_but_not_str(val2):
-            title = f"Key: {key}, GlobalId: {self.data.get('GlobalId')}"
-            differences = []
 
             for i in range(min(len(val1), len(val2))):
                 item1, item2 = val1[i], val2[i]
@@ -159,15 +135,39 @@ class FuzzyHashmap:
                 for i in range(len(val1), len(val2)):
                     differences.append([None, val2[i]])
 
-            if differences:
-                self.collector.add_difference(title, differences, None)
+        # if differences:
+        #     self.collector.add_difference(title, differences, None)
 
-    def compare(self, k, val1, val2):
+    def compare(self, key: str, val1: Sequence, val2: Sequence):
+        title = f"{key}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
         if is_sequence_but_not_str(val1) and is_sequence_but_not_str(val2):
-            self.compare_sequences(k, val1, val2)
+            self.compare_sequences(key, val1, val2)
         elif not equals_values(val1, val2):
-            title = f"Key: {k}, GlobalId: {self.data.get('GlobalId')}"
-            self.collector.add_difference(title, val1, val2)
+            if isinstance(val1, list):
+                self.collector.add_difference(
+                    f"{title}: Numeric lists differ",
+                    val1[:10] + (['...'] if len(val1) > 10 else []),
+                    val2[:10] + (['...'] if len(val2) > 10 else [])
+                )
+            if isinstance(val1, dict) and isinstance(val2, dict):
+                truncated_val1 = {k: val1[k] for k in list(val1.keys())[:2]}
+                truncated_val2 = {k: val2[k] for k in list(val2.keys())[:2]}
+                for key in truncated_val1:
+                    truncated_val1[key] = truncated_val1[key][:3] if isinstance(truncated_val1[key], (list, tuple)) else \
+                        truncated_val1[key]
+                for key in truncated_val2:
+                    truncated_val2[key] = truncated_val2[key][:3] if isinstance(truncated_val2[key], (list, tuple)) else \
+                        truncated_val2[key]
+                self.collector.add_difference(title, truncated_val1, truncated_val2)
+            else:
+                self.collector.add_difference(title, val1, val2)
 
-    def set_keys_to_ignore(self, keys: List[str]):
-        self.keys_to_ignore = keys
+    def set_parent_entity_guid(self, guid: str):
+        self.parent_entity_guid = guid
+
+    def setup_fuzzy_hashmap_from_dict(self, lhs, rhs):
+        fuzzy1 = FuzzyHashmap(lhs, self.tolerance, self.collector, self.compare_numeric_lists)
+        fuzzy1.set_parent_entity_guid(self.parent_entity_guid)
+        fuzzy2 = FuzzyHashmap(rhs, self.tolerance, self.collector, self.compare_numeric_lists)
+        fuzzy2.set_parent_entity_guid(self.parent_entity_guid)
+        return fuzzy1, fuzzy2
