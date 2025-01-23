@@ -27,7 +27,10 @@ def main():
     parser.add_argument("-dir", "--output_dir", type=str, required=True, help="Directory to save the output JSON file")
     parser.add_argument("-s", "--strategy", type=str, choices=[e.value for e in ComparisonStrategyType], nargs='+',
                         required=False, help="Strategy type to use for comparison")
-    parser.add_argument("-i", "--ignore", type=str, choices=['CoordIndex', 'CoordList'], nargs='+', required=False,
+    parser.add_argument("-i", "--ignore", type=str,
+                        choices=['CoordIndex', 'CoordList', 'Representation', 'ObjectPlacement',
+                                 'Coordinates'], nargs='+',
+                        required=False,
                         help="Keys to ignore during comparison")
     args = parser.parse_args()
 

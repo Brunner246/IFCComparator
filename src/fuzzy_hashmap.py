@@ -17,6 +17,10 @@ def is_float_type(obj):
     return isinstance(obj, float)
 
 
+def equals_float(lhs, rhs, tolerance=1e-5):
+    return False if abs(lhs - rhs) > tolerance else True
+
+
 class FuzzyHashmap:
     """
     A dictionary-like structure for approximate comparisons of numerical values and strings.
@@ -42,26 +46,35 @@ class FuzzyHashmap:
         def equals(lhs, rhs):
             if type(lhs) != type(rhs): return False
             if isinstance(lhs, float):
-                if abs(lhs - rhs) > self.tolerance:
-                    return False
+                return equals_float(lhs, rhs, self.tolerance)
             elif isinstance(lhs, dict):
-                fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(lhs, rhs)
-                if not (fuzzy1 == fuzzy2):
-                    return False
+                return equals_dict(lhs, rhs)
             elif isinstance(lhs, (tuple, list)):
-                if len(lhs) != len(rhs):
-                    return False
-                for a, b in zip(lhs, rhs):
-                    if isinstance(a, dict):
-                        fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(a, b)
-                        if not (fuzzy1 == fuzzy2):
-                            return False
-                    if not equals(a, b):
-                        return False
+                return equals_sequence(lhs, rhs)
             else:
                 if lhs != rhs:
                     return False
             return True
+
+        def equals_sequence(lhs, rhs):
+            if len(lhs) != len(rhs):
+                return False
+            for a, b in zip(lhs, rhs):
+                if isinstance(a, dict):
+                    fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(a, b)
+                    if not (fuzzy1 == fuzzy2):
+                        return False
+                if not equals(a, b):
+                    return False
+            else:
+                return True
+
+        def equals_dict(lhs, rhs):
+            fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(lhs, rhs)
+            if not (fuzzy1 == fuzzy2):
+                return False
+            else:
+                return True
 
         if set(self.data.keys()) != set(other.data.keys()): return False
 
@@ -113,12 +126,11 @@ class FuzzyHashmap:
 
     def compare_sequences(self, key: str, val1: Sequence, val2: Sequence):
         differences = []
-        # title = f"Key: {key}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
+        title = f"Key: {key}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
         if is_sequence_but_not_str(val1) and is_sequence_but_not_str(val2):
 
             for i in range(min(len(val1), len(val2))):
                 item1, item2 = val1[i], val2[i]
-
                 if is_sequence_but_not_str(item1) and is_sequence_but_not_str(item2):
                     self.compare_sequences(f"{key}[{i}]", item1, item2)
                 elif is_float_type(item1) and is_float_type(item2):
@@ -135,8 +147,8 @@ class FuzzyHashmap:
                 for i in range(len(val1), len(val2)):
                     differences.append([None, val2[i]])
 
-        # if differences:
-        #     self.collector.add_difference(title, differences, None)
+        if differences:
+            self.collector.add_difference(title, differences, None)
 
     def compare(self, key: str, val1: Sequence, val2: Sequence):
         title = f"{key}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
