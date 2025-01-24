@@ -21,6 +21,43 @@ def equals_float(lhs, rhs, tolerance=1e-5):
     return False if abs(lhs - rhs) > tolerance else True
 
 
+def compare_nested_dicts(dict1, dict2):
+    differences = {}
+
+    if dict1 == dict2:
+        return {}
+
+    if isinstance(dict1, dict) and isinstance(dict2, dict):
+        for key in dict1.keys() - dict2.keys():
+            differences[key] = {'dict1': dict1[key], 'dict2': None}
+
+        for key in dict2.keys() - dict1.keys():
+            differences[key] = {'dict1': None, 'dict2': dict2[key]}
+
+        for key in dict1.keys() & dict2.keys():
+            nested_diff = compare_nested_dicts(dict1[key], dict2[key])
+            if nested_diff:
+                differences[key] = nested_diff
+
+        return differences
+
+    if isinstance(dict1, (list, tuple)) and isinstance(dict2, (list, tuple)):
+        if len(dict1) != len(dict2):
+            return {'dict1': dict1, 'dict2': dict2}
+
+        for index, (item1, item2) in enumerate(zip(dict1, dict2)):
+            nested_diff = compare_nested_dicts(item1, item2)
+            if nested_diff:
+                differences[index] = nested_diff
+
+        return differences
+
+    if dict1 != dict2:
+        return {'dict1': dict1, 'dict2': dict2}
+
+    return differences
+
+
 class FuzzyHashmap:
     """
     A dictionary-like structure for approximate comparisons of numerical values and strings.
@@ -36,45 +73,13 @@ class FuzzyHashmap:
         self.mod = - int(round(math.log10(tolerance * 100)))
         self._hash = self._calculate_hash()
         self.collector = collector
-        self.compare_numeric_lists: List[ComparisonStrategy] | None = comparison_strategies
+        self.compare_numeric_lists_strategies: List[ComparisonStrategy] | None = comparison_strategies
         self.parent_entity_guid: str = ""
 
     def __hash__(self):
         return self._hash
 
     def __eq__(self, other):
-        def equals(lhs, rhs):
-            if type(lhs) != type(rhs): return False
-            if isinstance(lhs, float):
-                return equals_float(lhs, rhs, self.tolerance)
-            elif isinstance(lhs, dict):
-                return equals_dict(lhs, rhs)
-            elif isinstance(lhs, (tuple, list)):
-                return equals_sequence(lhs, rhs)
-            else:
-                if lhs != rhs:
-                    return False
-            return True
-
-        def equals_sequence(lhs, rhs):
-            if len(lhs) != len(rhs):
-                return False
-            for a, b in zip(lhs, rhs):
-                if isinstance(a, dict):
-                    fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(a, b)
-                    if not (fuzzy1 == fuzzy2):
-                        return False
-                if not equals(a, b):
-                    return False
-            else:
-                return True
-
-        def equals_dict(lhs, rhs):
-            fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(lhs, rhs)
-            if not (fuzzy1 == fuzzy2):
-                return False
-            else:
-                return True
 
         if set(self.data.keys()) != set(other.data.keys()): return False
 
@@ -85,8 +90,9 @@ class FuzzyHashmap:
 
             processed: bool = False
 
-            if self.compare_numeric_lists and is_sequence_but_not_str(val1) and is_sequence_but_not_str(val2):
-                for strategy in self.compare_numeric_lists:
+            if self.compare_numeric_lists_strategies and is_sequence_but_not_str(val1) and is_sequence_but_not_str(
+                    val2):
+                for strategy in self.compare_numeric_lists_strategies:
                     sorted_list1, sorted_list2 = strategy.compare(k, val1, val2)
                     if sorted_list1 == [] and sorted_list2 == []: continue
                     if sorted_list1 != sorted_list2:
@@ -99,11 +105,44 @@ class FuzzyHashmap:
                         processed = True
                         break
 
-            if not processed and not equals(val1, val2):
+            if not processed and not self.equals(val1, val2):
                 differences.append(False)
                 title = f"Key: {k}, GlobalId: {self.data.get('GlobalId', self.parent_entity_guid)}"
                 self.compare(title, val1, val2)
         return differences == []
+
+    def equals(self, lhs, rhs):
+        if type(lhs) != type(rhs): return False
+        if isinstance(lhs, float):
+            return equals_float(lhs, rhs, self.tolerance)
+        elif isinstance(lhs, dict):
+            return self.equals_dict(lhs, rhs)
+        elif isinstance(lhs, (tuple, list)):
+            return self.equals_sequence(lhs, rhs)
+        else:
+            if lhs != rhs:
+                return False
+        return True
+
+    def equals_sequence(self, lhs, rhs):
+        if len(lhs) != len(rhs):
+            return False
+        for a, b in zip(lhs, rhs):
+            if isinstance(a, dict):
+                fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(a, b)
+                if not (fuzzy1 == fuzzy2):
+                    return False
+            if not self.equals(a, b):
+                return False
+        else:
+            return True
+
+    def equals_dict(self, lhs, rhs):
+        fuzzy1, fuzzy2 = self.setup_fuzzy_hashmap_from_dict(lhs, rhs)
+        if not (fuzzy1 == fuzzy2):
+            return False
+        else:
+            return True
 
     def get_differences(self):
         return self.collector.get_differences()
@@ -162,15 +201,9 @@ class FuzzyHashmap:
                     val2[:10] + (['...'] if len(val2) > 10 else [])
                 )
             if isinstance(val1, dict) and isinstance(val2, dict):
-                truncated_val1 = {k: val1[k] for k in list(val1.keys())[:2]}
-                truncated_val2 = {k: val2[k] for k in list(val2.keys())[:2]}
-                for key in truncated_val1:
-                    truncated_val1[key] = truncated_val1[key][:3] if isinstance(truncated_val1[key], (list, tuple)) else \
-                        truncated_val1[key]
-                for key in truncated_val2:
-                    truncated_val2[key] = truncated_val2[key][:3] if isinstance(truncated_val2[key], (list, tuple)) else \
-                        truncated_val2[key]
-                self.collector.add_difference(title, truncated_val1, truncated_val2)
+                diff_keys = compare_nested_dicts(val1, val2)
+                for diff_key, diff_val in diff_keys.items():
+                    self.collector.add_difference(f"{title}.{diff_key}", diff_val['dict1'], diff_val['dict2'])
             else:
                 self.collector.add_difference(title, val1, val2)
 
@@ -178,8 +211,8 @@ class FuzzyHashmap:
         self.parent_entity_guid = guid
 
     def setup_fuzzy_hashmap_from_dict(self, lhs, rhs):
-        fuzzy1 = FuzzyHashmap(lhs, self.tolerance, self.collector, self.compare_numeric_lists)
+        fuzzy1 = FuzzyHashmap(lhs, self.tolerance, self.collector, self.compare_numeric_lists_strategies)
         fuzzy1.set_parent_entity_guid(self.parent_entity_guid)
-        fuzzy2 = FuzzyHashmap(rhs, self.tolerance, self.collector, self.compare_numeric_lists)
+        fuzzy2 = FuzzyHashmap(rhs, self.tolerance, self.collector, self.compare_numeric_lists_strategies)
         fuzzy2.set_parent_entity_guid(self.parent_entity_guid)
         return fuzzy1, fuzzy2

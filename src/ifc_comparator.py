@@ -1,5 +1,4 @@
 import logging
-import pprint
 import sys
 from typing import List
 
@@ -21,7 +20,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 
-def find_different_keys(dict1, dict2):
+def find_different_keys(dict1: dict, dict2: dict):
     keys1 = set(dict1.keys())
     keys2 = set(dict2.keys())
 
@@ -31,19 +30,26 @@ def find_different_keys(dict1, dict2):
     return keys_only_in_dict1, keys_only_in_dict2
 
 
-def get_attributes(element, ignore_attributes):
-    attributes = element.get_info(recursive=True, include_identifier=False,
-                                  ignore=ignore_attributes)  # {"OwnerHistory", "CoordList"}
-    attributes["Properties"] = ifcopenshell.util.element.get_psets(element)
-    attributes["Materials"] = (ifcopenshell.util.element.get_material(element)
-                               .get_info(recursive=False, include_identifier=False, ignore={"OwnerHistory"}))
-    # materials = ifcopenshell.util.element.get_materials(element)
+def get_entity_properties(element):
+    return ifcopenshell.util.element.get_psets(element)
 
-    # for material in materials:
-    #     attributes[material.Name] = material.get_info(recursive=True, ignore={"OwnerHistory"})
-    #     if element.is_a("IfcWall"): print(material.get_info(recursive=True, ignore={"OwnerHistory"}))
+
+def get_entity_materials(element):
+    return (ifcopenshell.util.element.get_material(element)
+            .get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"}))
+
+
+def get_entity_attributes(element, ignore_attributes):
+    attributes = element.get_info(recursive=True, include_identifier=False,
+                                  ignore=ignore_attributes)
+    attributes["Properties"] = get_entity_properties(element)
+    attributes["Materials"] = get_entity_materials(element)
 
     return attributes
+
+
+def get_entities_dict_from_file(file, entity_name: str):
+    return {e.GlobalId: e for e in file.by_type(entity_name)}
 
 
 class IFCComparator(FileComparator):
@@ -52,8 +58,8 @@ class IFCComparator(FileComparator):
         self.file2 = ifcopenshell.open(file2_path)
         logger.info(f"Opened files {file1_path} and {file2_path}")
         self.collector = collector
-        self.old_file_entities = {e.GlobalId: e for e in self.file1.by_type('IfcBuildingElement')}
-        self.new_file_entities = {e.GlobalId: e for e in self.file2.by_type('IfcBuildingElement')}
+        self.old_file_entities = get_entities_dict_from_file(self.file1, 'IfcBuildingElement')
+        self.new_file_entities = get_entities_dict_from_file(self.file2, 'IfcBuildingElement')
         self.comparison_strategy: List[ComparisonStrategy] | None = None
         self.keys_to_ignore: List[str] = []
 
@@ -94,7 +100,7 @@ class IFCComparator(FileComparator):
         return True
 
     def create_fuzzy_hashmap(self, attributes_to_ignore, entity_lhs):
-        fuzzy_attrs1 = FuzzyHashmap(get_attributes(entity_lhs, attributes_to_ignore), tolerance=1e-3,
+        fuzzy_attrs1 = FuzzyHashmap(get_entity_attributes(entity_lhs, attributes_to_ignore), tolerance=1e-3,
                                     collector=self.collector,
                                     comparison_strategies=self.comparison_strategy)
         fuzzy_attrs1.set_parent_entity_guid(entity_lhs.GlobalId)
