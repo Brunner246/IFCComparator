@@ -1,13 +1,15 @@
-import pprint
 import logging
 import sys
+from typing import List
 
 import ifcopenshell
+import ifcopenshell.util
 import ifcopenshell.util.element
 
 from src.fuzzy_hashmap import FuzzyHashmap
 from src.interfaces.differences_collector import DifferencesCollector
 from src.interfaces.file_comparator import FileComparator
+from src.value_comparison_strategies import ComparisonStrategy
 
 handler = logging.StreamHandler(sys.stdout)
 frm = logging.Formatter("{asctime} {levelname}: {message}", "%d.%m.%Y %H:%M:%S", style="{")
@@ -18,7 +20,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 
-def find_different_keys(dict1, dict2):
+def find_different_keys(dict1: dict, dict2: dict):
     keys1 = set(dict1.keys())
     keys2 = set(dict2.keys())
 
@@ -28,15 +30,26 @@ def find_different_keys(dict1, dict2):
     return keys_only_in_dict1, keys_only_in_dict2
 
 
-def get_attributes(element):
-    attributes = element.get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"})  # "GlobalId",
+def get_entity_properties(element):
+    return ifcopenshell.util.element.get_psets(element)
 
-    attributes["Properties"] = ifcopenshell.util.element.get_psets(element)
-    attributes["Materials"] = ifcopenshell.util.element.get_material(element).get_info(recursive=True,
-                                                                                       ignore={
-                                                                                           "OwnerHistory"})  # get_materials(element)
+
+def get_entity_materials(element):
+    return (ifcopenshell.util.element.get_material(element)
+            .get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"}))
+
+
+def get_entity_attributes(element, ignore_attributes):
+    attributes = element.get_info(recursive=True, include_identifier=False,
+                                  ignore=ignore_attributes)
+    attributes["Properties"] = get_entity_properties(element)
+    attributes["Materials"] = get_entity_materials(element)
 
     return attributes
+
+
+def get_entities_dict_from_file(file, entity_name: str):
+    return {e.GlobalId: e for e in file.by_type(entity_name)}
 
 
 class IFCComparator(FileComparator):
@@ -45,25 +58,37 @@ class IFCComparator(FileComparator):
         self.file2 = ifcopenshell.open(file2_path)
         logger.info(f"Opened files {file1_path} and {file2_path}")
         self.collector = collector
-        self.old_file_entities = {e.GlobalId: e for e in self.file1.by_type('IfcBuildingElement')}
-        self.new_file_entities = {e.GlobalId: e for e in self.file2.by_type('IfcBuildingElement')}
+        self.old_file_entities = get_entities_dict_from_file(self.file1, 'IfcBuildingElement')
+        self.new_file_entities = get_entities_dict_from_file(self.file2, 'IfcBuildingElement')
+        self.comparison_strategy: List[ComparisonStrategy] | None = None
+        self.keys_to_ignore: List[str] = []
 
         self.added_in_new = set()
         self.deleted_from_old = set()
         self.unchanged_in_new = set()
 
     def compare_elements(self, entity_lhs, entity_rhs):
-        attrs1 = FuzzyHashmap(get_attributes(entity_lhs), collector=self.collector)
-        attrs2 = FuzzyHashmap(get_attributes(entity_rhs), collector=self.collector)
+        attributes_to_ignore = {"OwnerHistory"}
+        if self.keys_to_ignore:
+            attributes_to_ignore.update(self.keys_to_ignore)
+
+        fuzzy_attrs1 = self.create_fuzzy_hashmap(attributes_to_ignore, entity_lhs)
+        fuzzy_attrs2 = self.create_fuzzy_hashmap(attributes_to_ignore, entity_rhs)
 
         keys_only_in_dict1, keys_only_in_dict2 = find_different_keys(self.old_file_entities, self.new_file_entities)
 
-        if attrs1 != attrs2:
+        return self.compare_fuzzy_hashmaps_and_validate_equality(entity_lhs, entity_rhs,
+                                                                 fuzzy_attrs1,
+                                                                 fuzzy_attrs2,
+                                                                 keys_only_in_dict1,
+                                                                 keys_only_in_dict2)
+
+    def compare_fuzzy_hashmaps_and_validate_equality(self, entity_lhs, entity_rhs, fuzzy_attrs1, fuzzy_attrs2,
+                                                     keys_only_in_dict1, keys_only_in_dict2):
+        if fuzzy_attrs1 != fuzzy_attrs2:
             logger.warning(f"Attributes differ between GUID {entity_lhs.GlobalId} and GUID {entity_rhs.GlobalId}")
-            pprint.pprint(attrs1.get_differences())
             self.added_in_new.add(entity_rhs.GlobalId)
             return False
-
         if keys_only_in_dict1 - keys_only_in_dict2:
             logger.warning(f"Attributes missing in {entity_rhs.GlobalId}")
             self.added_in_new.add(entity_rhs.GlobalId)
@@ -71,9 +96,15 @@ class IFCComparator(FileComparator):
         if keys_only_in_dict2 - keys_only_in_dict1:
             logger.warning(f"Attributes missing in {entity_lhs.GlobalId}")
             self.deleted_from_old.add(entity_lhs.GlobalId)
-
             return False
         return True
+
+    def create_fuzzy_hashmap(self, attributes_to_ignore, entity_lhs):
+        fuzzy_attrs1 = FuzzyHashmap(get_entity_attributes(entity_lhs, attributes_to_ignore), tolerance=1e-3,
+                                    collector=self.collector,
+                                    comparison_strategies=self.comparison_strategy)
+        fuzzy_attrs1.set_parent_entity_guid(entity_lhs.GlobalId)
+        return fuzzy_attrs1
 
     def compare_files(self):
         differences = []
@@ -93,3 +124,10 @@ class IFCComparator(FileComparator):
                         if global_id not in self.old_file_entities]
 
         return True if len(differences) == 0 else False
+
+    def set_comparison_strategy(self,
+                                comparison_strategy: List[ComparisonStrategy]):
+        self.comparison_strategy = comparison_strategy
+
+    def set_keys_to_ignore(self, keys: List[str]):
+        self.keys_to_ignore = keys
