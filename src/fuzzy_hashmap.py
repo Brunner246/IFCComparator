@@ -203,7 +203,7 @@ class FuzzyHashmap:
             if isinstance(val1, dict) and isinstance(val2, dict):
                 diff_keys = compare_nested_dicts(val1, val2)
                 for diff_key, diff_val in diff_keys.items():
-                    self.collector.add_difference(f"{title}.{diff_key}", diff_val['dict1'], diff_val['dict2'])
+                    self.collector.add_difference(f"{title}.{diff_key}", diff_val.get("dict1", None), diff_val.get('dict2', None))
             else:
                 self.collector.add_difference(title, val1, val2)
 

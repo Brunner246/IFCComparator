@@ -16,10 +16,12 @@ class TestIFCComparator(unittest.TestCase):
         # self.file2_path = './old.ifc'
         # self.file1_path = './materialLayer1.ifc'
         # self.file2_path = './materialLayer2.ifc'
-        self.file1_path = './test_ifc_assembly_steel.ifc'
-        self.file2_path = './test_ifc_assembly_steel_expected.ifc'
+        # self.file1_path = './test_ifc_assembly_steel.ifc'
+        # self.file2_path = './test_ifc_assembly_steel_expected.ifc'
         # self.file1_path = './test_multi_layer_set.ifc'
         # self.file2_path = './test_multi_layer_set_expected.ifc'
+        self.file1_path = './test_ifc_mechanical_fastener.ifc'
+        self.file2_path = './test_ifc_mechanical_fastener_expected.ifc'
 
         factory = IfcFileComparatorFactoryImpl(self.file1_path, self.file2_path)
         self.differences_collector = ListDifferencesCollector()
