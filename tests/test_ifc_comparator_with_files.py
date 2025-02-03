@@ -20,18 +20,15 @@ class TestIFCComparator(unittest.TestCase):
         # self.file2_path = './test_ifc_assembly_steel_expected.ifc'
         # self.file1_path = './test_multi_layer_set.ifc'
         # self.file2_path = './test_multi_layer_set_expected.ifc'
-        self.file1_path = './test_ifc_mechanical_fastener.ifc'
-        self.file2_path = './test_ifc_mechanical_fastener_expected.ifc'
+        # self.file1_path = './test_ifc_mechanical_fastener.ifc'
+        # self.file2_path = './test_ifc_mechanical_fastener_expected.ifc'
+        self.file1_path = './test_ifc_space.ifc'
+        self.file2_path = './test_ifc_space_expected.ifc'
 
         factory = IfcFileComparatorFactoryImpl(self.file1_path, self.file2_path)
         self.differences_collector = ListDifferencesCollector()
         self.comparator = factory.create(FileType.IFC, self.differences_collector)
-        strategies = [StrategyFactory.create_strategy(st) for st in
-                      [ComparisonStrategyType.COORDINATES,
-                       ComparisonStrategyType.COORDINDEX,
-                       ComparisonStrategyType.COORDLIST]]
-        if strategies:
-            self.comparator.set_comparison_strategy(strategies)
+
         self.comparator.set_keys_to_ignore(["CoordIndex"])
 
     def test_compare_files(self):
