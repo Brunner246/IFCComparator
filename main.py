@@ -1,8 +1,13 @@
 import argparse
 import json
-import os
 import sys
 from typing import TextIO
+
+from src.differences_collector_factory import DifferencesCollectorFactory, CollectionType
+from src.file_comparator_factory_impl import IfcFileComparatorFactoryImpl
+from src.interfaces.file_comparator import FileComparator
+from src.interfaces.file_comparator_factory import FileType
+
 
 # os.environ['PYTHONPATH'] = os.pathsep.join([
 #     os.path.join(os.path.dirname(__file__), '.venv', 'Lib', 'site-packages'),
@@ -13,25 +18,9 @@ from typing import TextIO
 #
 # sys.path.extend(os.environ['PYTHONPATH'].split(os.pathsep))
 
-from src.interfaces.file_comparator_factory import FileType
-from src.interfaces.file_comparator import FileComparator
-from src.file_comparator_factory_impl import IfcFileComparatorFactoryImpl
-from src.differences_collector_factory import DifferencesCollectorFactory, CollectionType
-from src.value_comparison_strategy_factory import ComparisonStrategyType, StrategyFactory
-
 
 def main():
-    parser = argparse.ArgumentParser(description="Compare two IFC files.")
-    parser.add_argument("-f1", "--file1_path", type=str, required=True, help="Path to the first IFC file")
-    parser.add_argument("-f2", "--file2_path", type=str, required=True, help="Path to the second IFC file")
-    parser.add_argument("-dir", "--output_dir", type=str, required=True, help="Directory to save the output JSON file")
-    parser.add_argument("-s", "--strategy", type=str, choices=[e.value for e in ComparisonStrategyType], nargs='+',
-                        required=False, help="Strategy type to use for comparison")
-    parser.add_argument("-i", "--ignore", type=str,
-                        choices=['CoordIndex', 'CoordList', 'Representation', 'ObjectPlacement',
-                                 'Coordinates'], nargs='+',
-                        required=False,
-                        help="Keys to ignore during comparison")
+    parser = set_up_arg_parser()
     args = parser.parse_args()
 
     output_path = f"{args.output_dir}/differences.json"
@@ -39,9 +28,6 @@ def main():
     factory = IfcFileComparatorFactoryImpl(args.file1_path, args.file2_path)
     differences_collector = DifferencesCollectorFactory.create(CollectionType.LIST)
     comparator: FileComparator = factory.create(FileType.IFC, differences_collector)
-    if args.strategy:
-        strategies = [StrategyFactory.create_strategy(ComparisonStrategyType(st)) for st in args.strategy]
-        comparator.set_comparison_strategy(strategies)
 
     if args.ignore:
         comparator.set_keys_to_ignore(args.ignore)
@@ -62,6 +48,19 @@ def main():
 
     print("Done.")
     return sys.exit(0)
+
+
+def set_up_arg_parser():
+    parser = argparse.ArgumentParser(description="Compare two IFC files.")
+    parser.add_argument("-f1", "--file1_path", type=str, required=True, help="Path to the first IFC file")
+    parser.add_argument("-f2", "--file2_path", type=str, required=True, help="Path to the second IFC file")
+    parser.add_argument("-dir", "--output_dir", type=str, required=True, help="Directory to save the output JSON file")
+    parser.add_argument("-i", "--ignore", type=str,
+                        choices=['CoordIndex', 'CoordList', 'Representation', 'ObjectPlacement',
+                                 'Coordinates'], nargs='+',
+                        required=False,
+                        help="Keys to ignore during comparison")
+    return parser
 
 
 if __name__ == "__main__":

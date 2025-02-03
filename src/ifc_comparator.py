@@ -3,13 +3,15 @@ import sys
 from typing import List
 
 import ifcopenshell
+import ifcopenshell.geom
 import ifcopenshell.util
 import ifcopenshell.util.element
+
+import numpy as np
 
 from src.fuzzy_hashmap import FuzzyHashmap
 from src.interfaces.differences_collector import DifferencesCollector
 from src.interfaces.file_comparator import FileComparator
-from src.value_comparison_strategies import ComparisonStrategy
 
 handler = logging.StreamHandler(sys.stdout)
 frm = logging.Formatter("{asctime} {levelname}: {message}", "%d.%m.%Y %H:%M:%S", style="{")
@@ -35,21 +37,45 @@ def get_entity_properties(element):
 
 
 def get_entity_materials(element):
-    return (ifcopenshell.util.element.get_material(element)
-            .get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"}))
+    if material := ifcopenshell.util.element.get_material(element):
+        return material.get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"})
+
+
+def get_entity_geometry(element):
+    settings = ifcopenshell.geom.settings()
+    settings.set(settings.USE_WORLD_COORDS, True)
+    shape = ifcopenshell.geom.create_shape(settings, element)
+    if shape:
+        # each vertex consists of 3 values (X, Y, Z), reshaping it into (-1, 3)
+        # organizes it into an array where each row represents a vertex with three coordinates
+        vertices = np.array(shape.geometry.verts).reshape(-1, 3)
+        faces = np.array(shape.geometry.faces).reshape(-1, 3)
+        return {"vertices": vertices.tolist(), "faces": faces.tolist()}
 
 
 def get_entity_attributes(element, ignore_attributes):
     attributes = element.get_info(recursive=True, include_identifier=False,
                                   ignore=ignore_attributes)
     attributes["Properties"] = get_entity_properties(element)
-    attributes["Materials"] = get_entity_materials(element)
+    if element.is_a("IfcBuildingElement"):
+        attributes["Materials"] = get_entity_materials(element)
+        get_entity_geometry_handle_exception(attributes, element)
 
     return attributes
 
 
-def get_entities_dict_from_file(file, entity_name: str):
-    return {e.GlobalId: e for e in file.by_type(entity_name)}
+def get_entity_geometry_handle_exception(attributes, element):
+    try:
+        attributes["Geometry"] = get_entity_geometry(element)
+    except RuntimeError as e:
+        logger.error(f"Failed to extract geometry for {element.GlobalId}: {e}")
+
+
+def get_entities_dict_from_file(file, entity_types: List[str]):
+    entities = {}
+    for entity_type in entity_types:
+        entities.update({e.GlobalId: e for e in file.by_type(entity_type)})
+    return entities
 
 
 class IFCComparator(FileComparator):
@@ -58,9 +84,12 @@ class IFCComparator(FileComparator):
         self.file2 = ifcopenshell.open(file2_path)
         logger.info(f"Opened files {file1_path} and {file2_path}")
         self.collector = collector
-        self.old_file_entities = get_entities_dict_from_file(self.file1, 'IfcBuildingElement')
-        self.new_file_entities = get_entities_dict_from_file(self.file2, 'IfcBuildingElement')
-        self.comparison_strategy: List[ComparisonStrategy] | None = None
+
+        entity_types = ['IfcSpace', 'IfcBuildingElement']
+
+        self.old_file_entities = get_entities_dict_from_file(self.file1, entity_types)
+        self.new_file_entities = get_entities_dict_from_file(self.file2, entity_types)
+
         self.keys_to_ignore: List[str] = []
 
         self.added_in_new = set()
@@ -100,9 +129,8 @@ class IFCComparator(FileComparator):
         return True
 
     def create_fuzzy_hashmap(self, attributes_to_ignore, entity_lhs):
-        fuzzy_attrs1 = FuzzyHashmap(get_entity_attributes(entity_lhs, attributes_to_ignore), tolerance=1e-3,
-                                    collector=self.collector,
-                                    comparison_strategies=self.comparison_strategy)
+        fuzzy_attrs1 = FuzzyHashmap(get_entity_attributes(entity_lhs, attributes_to_ignore), tolerance=1e-5,
+                                    collector=self.collector)
         fuzzy_attrs1.set_parent_entity_guid(entity_lhs.GlobalId)
         return fuzzy_attrs1
 
@@ -124,10 +152,6 @@ class IFCComparator(FileComparator):
                         if global_id not in self.old_file_entities]
 
         return True if len(differences) == 0 else False
-
-    def set_comparison_strategy(self,
-                                comparison_strategy: List[ComparisonStrategy]):
-        self.comparison_strategy = comparison_strategy
 
     def set_keys_to_ignore(self, keys: List[str]):
         self.keys_to_ignore = keys
