@@ -9,14 +9,9 @@ class TestCompareGeometry(unittest.TestCase):
         self.file1_path = './test_ifc_assembly_steel.ifc'
         self.file2_path = './test_ifc_assembly_steel_expected.ifc'
 
-        # self.file1_path = './test_simple_ifc_member.ifc'
-        # self.file2_path = './test_simple_ifc_member_expected.ifc'
-
-        # Load IFC models
         self.model1 = ifcopenshell.open(self.file1_path)
         self.model2 = ifcopenshell.open(self.file2_path)
 
-        # Set up geometry processing settings
         self.settings = ifcopenshell.geom.settings()
         self.settings.set(self.settings.USE_WORLD_COORDS, True)
 
@@ -39,10 +34,8 @@ class TestCompareGeometry(unittest.TestCase):
         geometry1 = self.extract_brep_geometry(self.model1)
         geometry2 = self.extract_brep_geometry(self.model2)
 
-        # Check if both have the same GlobalIds
         self.assertEqual(set(geometry1.keys()), set(geometry2.keys()), "Mismatch in GlobalIds")
 
-        # Compare geometry (detailed check on vertices and faces)
         for global_id in geometry1:
             vertices1 = geometry1[global_id]["vertices"]
             vertices2 = geometry2[global_id]["vertices"]
@@ -52,7 +45,6 @@ class TestCompareGeometry(unittest.TestCase):
             self.assertEqual(vertices1.shape, vertices2.shape, f"Vertex count mismatch for {global_id}")
             self.assertEqual(faces1.shape, faces2.shape, f"Face count mismatch for {global_id}")
 
-            # Compare vertices and faces with a tolerance
             np.testing.assert_allclose(vertices1, vertices2, atol=1e-6, err_msg=f"Vertex mismatch for {global_id}")
             np.testing.assert_array_equal(faces1, faces2, err_msg=f"Face connectivity mismatch for {global_id}")
 
