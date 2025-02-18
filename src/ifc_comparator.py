@@ -50,7 +50,7 @@ def get_entity_geometry(element):
         # organizes it into an array where each row represents a vertex with three coordinates
         vertices = np.array(shape.geometry.verts).reshape(-1, 3)
         faces = np.array(shape.geometry.faces).reshape(-1, 3)
-        return {"vertices": vertices.tolist(), "faces": faces.tolist()}
+        return {"vertices": sorted(vertices.tolist()), "faces": sorted(faces.tolist())}
 
 
 def get_entity_attributes(element, ignore_attributes):
