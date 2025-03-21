@@ -1,0 +1,66 @@
+    {
+        "3UfZvGkdH5Lh6xFjl_h51J": {
+            "BIMWood_Common": {
+                "Local coordinate system": {
+                    "type": "complex",
+                    "description": "Local coordinate system",
+                    "properties": {
+                        "Location": {
+                            "type": "complex",
+                            "description": "Location",
+                            "properties": {
+                                "X": {
+                                    "value": 1408.320556640625,
+                                    "unit": null
+                                },
+                                "Y": {
+                                    "value": 1680.2928466796875,
+                                    "unit": null
+                                },
+                                "Z": {
+                                    "value": -1094.3482666015625,
+                                    "unit": null
+                                }
+                            }
+                        },
+                        "Axis": {
+                            "type": "complex",
+                            "description": "Axis",
+                            "properties": {
+                                "X": {
+                                    "value": 0.0,
+                                    "unit": null
+                                },
+                                "Y": {
+                                    "value": 0.0,
+                                    "unit": null
+                                },
+                                "Z": {
+                                    "value": 1.0,
+                                    "unit": null
+                                }
+                            }
+                        },
+                        "RefDirection": {
+                            "type": "complex",
+                            "description": "Reference Direction",
+                            "properties": {
+                                "X": {
+                                    "value": 0.0,
+                                    "unit": null
+                                },
+                                "Y": {
+                                    "value": 1.0,
+                                    "unit": null
+                                },
+                                "Z": {
+                                    "value": 0.0,
+                                    "unit": null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
