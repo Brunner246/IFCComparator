@@ -24,8 +24,11 @@ class TestIFCComparator(unittest.TestCase):
         # self.file2_path = './test_ifc_mechanical_fastener_expected.ifc'
         # self.file1_path = './test_ifc_space.ifc'
         # self.file2_path = './test_ifc_space_expected.ifc'
-        self.file1_path = "C:\\Users\\MichaelBrunner\\Downloads\\IFC_Export_2025vsV30_comparison\\TEST-MBR.ifc"
-        self.file2_path = 'C:\\Users\\MichaelBrunner\\Downloads\\IFC_Export_2025vsV30_comparison\\MODIFIED_231018_Blumer_Lehmann_RFL_Demo-Element_v30.ifc'
+
+        # self.file1_path = "C:\\Users\\MichaelBrunner\\Downloads\\IFC_Export_2025vsV30_comparison\\TEST-MBR.ifc"
+        # self.file2_path = 'C:\\Users\\MichaelBrunner\\Downloads\\IFC_Export_2025vsV30_comparison\\MODIFIED_231018_Blumer_Lehmann_RFL_Demo-Element_v30.ifc'
+        self.file1_path =  r"C:\source\Autotest\tests\IfcFileCompare\schema_2x3\test_ifc_pset_datatyp\test_ifc_pset_datatyp.ifc"
+        self.file2_path =  r"C:\source\Autotest\tests\IfcFileCompare\schema_2x3\test_ifc_pset_datatyp\test_ifc_pset_datatyp_expected.ifc"
 
         factory = IfcFileComparatorFactoryImpl(self.file1_path, self.file2_path)
         self.differences_collector = ListDifferencesCollector()

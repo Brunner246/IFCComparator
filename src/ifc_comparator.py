@@ -6,7 +6,6 @@ import ifcopenshell
 import ifcopenshell.geom
 import ifcopenshell.util
 import ifcopenshell.util.element
-
 import numpy as np
 
 from src.fuzzy_hashmap import FuzzyHashmap
@@ -39,6 +38,7 @@ def get_entity_properties(element):
 def get_entity_materials(element):
     if material := ifcopenshell.util.element.get_material(element):
         return material.get_info(recursive=True, include_identifier=False, ignore={"OwnerHistory"})
+    return None
 
 
 def get_entity_geometry(element):
@@ -51,6 +51,7 @@ def get_entity_geometry(element):
         vertices = np.array(shape.geometry.verts).reshape(-1, 3)
         faces = np.array(shape.geometry.faces).reshape(-1, 3)
         return {"vertices": sorted(vertices.tolist()), "faces": sorted(faces.tolist())}
+    return None
 
 
 def get_entity_attributes(element, ignore_attributes):
@@ -143,9 +144,19 @@ class IFCComparator(FileComparator):
                 if not self.compare_elements(element1, element2):
                     differences.append(
                         f"Attributes differ between GUID {element1.GlobalId} and GUID {element2.GlobalId}")
+                    if self.collector:
+                        self.collector.add_difference(
+                            title=f"Attributes differ between GUID {element1.GlobalId} and GUID {element2.GlobalId}",
+                            val1=element1.GlobalId,
+                            val2=element2.GlobalId)
             else:
                 differences.append(
                     f"Element Name [{element1.Name}] with GUID [{global_id}] is missing in the second file")
+                if self.collector:
+                    self.collector.add_difference(
+                        title=f"Element Name [{element1.Name}] with GUID [{global_id}] is missing in the second file",
+                        val1=element1.GlobalId,
+                        val2=None)
 
         differences += [f"Element {global_id} is missing in the first file"
                         for global_id in self.new_file_entities.keys()
