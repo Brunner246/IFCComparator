@@ -27,8 +27,8 @@ class TestIFCComparator(unittest.TestCase):
 
         # self.file1_path = "C:\\Users\\MichaelBrunner\\Downloads\\IFC_Export_2025vsV30_comparison\\TEST-MBR.ifc"
         # self.file2_path = 'C:\\Users\\MichaelBrunner\\Downloads\\IFC_Export_2025vsV30_comparison\\MODIFIED_231018_Blumer_Lehmann_RFL_Demo-Element_v30.ifc'
-        self.file1_path =  r"C:\source\Autotest\tests\IfcFileCompare\schema_2x3\test_ifc_pset_datatyp\test_ifc_pset_datatyp.ifc"
-        self.file2_path =  r"C:\source\Autotest\tests\IfcFileCompare\schema_2x3\test_ifc_pset_datatyp\test_ifc_pset_datatyp_expected.ifc"
+        self.file1_path =  r"C:\source\Autotest\tests\IfcFileCompare\schema_2x3\test_ifc_stair\test_ifc_stair.ifc"
+        self.file2_path =  r"C:\source\Autotest\tests\IfcFileCompare\schema_2x3\test_ifc_stair\test_ifc_stair_expected.ifc"
 
         factory = IfcFileComparatorFactoryImpl(self.file1_path, self.file2_path)
         self.differences_collector = ListDifferencesCollector()
@@ -44,7 +44,7 @@ class TestIFCComparator(unittest.TestCase):
             current_directory = os.getcwd()
             output_path = os.path.join(current_directory, 'differences.json')
             with open(output_path, 'w') as json_file:  # type: TextIO
-                json.dump(output_data, json_file, indent=4)
+                json.dump(output_data, json_file, indent=4) # type: ignore
             print(f"Differences written to {output_path}")
         self.assertTrue(result)
 

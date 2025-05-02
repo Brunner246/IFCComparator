@@ -80,6 +80,8 @@ def get_entities_dict_from_file(file, entity_types: List[str]):
 
 
 class IFCComparator(FileComparator):
+    EXCLUDED_ENTITY_TYPES = ["IfcStair", "IfcDoor", "IfcWindow"]
+
     def __init__(self, file1_path, file2_path, collector: DifferencesCollector = None):
         self.file1 = ifcopenshell.open(file1_path)
         self.file2 = ifcopenshell.open(file2_path)
@@ -92,6 +94,7 @@ class IFCComparator(FileComparator):
         self.new_file_entities = get_entities_dict_from_file(self.file2, entity_types)
 
         self.keys_to_ignore: List[str] = []
+        self.excluded_entity_types = self.EXCLUDED_ENTITY_TYPES
 
         self.added_in_new = set()
         self.deleted_from_old = set()
@@ -107,18 +110,32 @@ class IFCComparator(FileComparator):
 
         keys_only_in_dict1, keys_only_in_dict2 = find_different_keys(self.old_file_entities, self.new_file_entities)
 
-        return self.compare_fuzzy_hashmaps_and_validate_equality(entity_lhs, entity_rhs,
+        return self.compare_fuzzy_hashmaps_and_validate_equality(entity_lhs,
+                                                                 entity_rhs,
                                                                  fuzzy_attrs1,
                                                                  fuzzy_attrs2,
                                                                  keys_only_in_dict1,
                                                                  keys_only_in_dict2)
 
-    def compare_fuzzy_hashmaps_and_validate_equality(self, entity_lhs, entity_rhs, fuzzy_attrs1, fuzzy_attrs2,
-                                                     keys_only_in_dict1, keys_only_in_dict2):
+    def compare_fuzzy_hashmaps_and_validate_equality(self,
+                                                     entity_lhs,
+                                                     entity_rhs,
+                                                     fuzzy_attrs1,
+                                                     fuzzy_attrs2,
+                                                     keys_only_in_dict1,
+                                                     keys_only_in_dict2):
         if fuzzy_attrs1 != fuzzy_attrs2:
             logger.warning(f"Attributes differ between GUID {entity_lhs.GlobalId} and GUID {entity_rhs.GlobalId}")
             self.added_in_new.add(entity_rhs.GlobalId)
             return False
+
+        entities_file_1 = [self.file1.by_guid(guid).is_a() for guid in keys_only_in_dict1]
+        entities_file_2 = [self.file2.by_guid(guid).is_a() for guid in keys_only_in_dict2]
+        if (all(entity in self.excluded_entity_types for entity in entities_file_1) and
+                all(entity in self.excluded_entity_types for entity in entities_file_2)):
+            # Stairs, doors, and windows are not compared - GUID is not consistent from cadwork
+            return True
+
         if keys_only_in_dict1 - keys_only_in_dict2:
             logger.warning(f"Attributes missing in {entity_rhs.GlobalId}")
             self.added_in_new.add(entity_rhs.GlobalId)
@@ -136,33 +153,36 @@ class IFCComparator(FileComparator):
         return fuzzy_attrs1
 
     def compare_files(self):
-        differences = []
 
         for global_id, element1 in self.old_file_entities.items():
             if global_id in self.new_file_entities:
                 element2 = self.new_file_entities[global_id]
                 if not self.compare_elements(element1, element2):
-                    differences.append(
-                        f"Attributes differ between GUID {element1.GlobalId} and GUID {element2.GlobalId}")
-                    if self.collector:
-                        self.collector.add_difference(
-                            title=f"Attributes differ between GUID {element1.GlobalId} and GUID {element2.GlobalId}",
-                            val1=element1.GlobalId,
-                            val2=element2.GlobalId)
+                    if not self.collector: break
+                    self.collector.add_difference(
+                        title=f"Attributes differ between GUID {element1.GlobalId} and GUID {element2.GlobalId}",
+                        val1=element1.GlobalId,
+                        val2=element2.GlobalId)
             else:
-                differences.append(
-                    f"Element Name [{element1.Name}] with GUID [{global_id}] is missing in the second file")
-                if self.collector:
+                # If the element is not in the new file, check if it is a stair, door, or window
+                if element1.is_a() in self.excluded_entity_types:
+                    pass
+                else:
+                    if not self.collector: break
                     self.collector.add_difference(
                         title=f"Element Name [{element1.Name}] with GUID [{global_id}] is missing in the second file",
                         val1=element1.GlobalId,
                         val2=None)
 
-        differences += [f"Element {global_id} is missing in the first file"
-                        for global_id in self.new_file_entities.keys()
-                        if global_id not in self.old_file_entities]
+        for global_id in self.new_file_entities.keys():
+            if (global_id not in self.old_file_entities and self.file2.by_guid(global_id).is_a()
+                    not in self.excluded_entity_types):
+                if not self.collector: break
+                self.collector.add_difference(title=f"Element Name [{global_id}] is missing in the second file",
+                                              val1=None,
+                                              val2=global_id)
 
-        return True if len(differences) == 0 else False
+        return True if len(self.collector.get_differences()) == 0 else False
 
     def set_keys_to_ignore(self, keys: List[str]):
         self.keys_to_ignore = keys
