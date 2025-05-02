@@ -52,7 +52,8 @@ class FuzzyHashmap:
                 if not (fuzzy1 == fuzzy2):
                     return False
             elif isinstance(lhs, (tuple, list)):
-                if len(lhs) != len(rhs): return False
+                if len(lhs) != len(rhs):
+                    return False
                 for a, b in zip(lhs, rhs):
                     if not equal(a, b):
                         return False
@@ -63,7 +64,8 @@ class FuzzyHashmap:
                     return False
             return True
 
-        if set(self.data.keys()) != set(other.data.keys()): return
+        if set(self.data.keys()) != set(other.data.keys()):
+            return False
 
         data_gen = ((self.data[k], other.data[k]) for k in self.data)
         for v1, v2 in data_gen:

@@ -64,7 +64,7 @@ def set_up_arg_parser():
 
 
 if __name__ == "__main__":
-    # python .\main.py
+    # python .\main_complex_property.py
     # -f1
     # tests/test_ifc_assembly_steel.ifc
     # -f2
